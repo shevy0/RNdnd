@@ -1,4 +1,4 @@
-import React, {useCallback, useRef} from 'react';
+import React, {useCallback, useRef, useState, useContext} from 'react';
 import {ViewStyle} from 'react-native';
 import {
   LongPressGestureHandler,
@@ -23,12 +23,14 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Styles from './styles';
+import AppContext from '../../context/AppContext';
+import {PlayerItem} from '../../context/AppContext';
 
 type Props = {
   index: number;
   order: SharedValue<number[]>;
   initialOrder: number[];
-  data: SharedValue<any[]>;
+  data: SharedValue<PlayerItem[]>;
   itemWidth: number;
   itemHeight: number;
   margin: number;
@@ -42,14 +44,17 @@ type Props = {
   cancelEditing: () => void;
   renderItem: () => JSX.Element;
   deleteRenderItem: () => JSX.Element;
-  openFolder: (folderData: any) => void;
-  onClose: () => void;
+  openFolder: (folderData: PlayerItem) => void;
+  onClose: (x: number, y: number) => void;
   deleteStyle?: ViewStyle;
   activeItemIndex: SharedValue<number>;
   parentWidth: number;
   parentHeight: number;
   display: SharedValue<string>;
   folderIndex?: number;
+  isOutside: boolean;
+  setIsOutside: React.Dispatch<React.SetStateAction<boolean>>;
+  isFolderGrid: boolean;
 };
 
 const springConfig: WithSpringConfig = {
@@ -61,7 +66,7 @@ const LONG_PRESS_DURATION = 300;
 function DraggableItem({
   index,
   order,
-  initialOrder,
+  initialOrder, //unused
   data,
   itemWidth,
   itemHeight,
@@ -81,15 +86,21 @@ function DraggableItem({
   deleteStyle,
   activeItemIndex,
   parentHeight,
-  folderIndex,
+  folderIndex, //unused
+  isOutside,
+  setIsOutside,
+  isFolderGrid,
 }: Props) {
+  const {draggedCoordinates, addToMainGrid} = useContext(AppContext);
+
   const isHeld = useSharedValue(false);
   const isMoving = useSharedValue(false);
   const scale = useSharedValue(1);
   const scaleHovered = useSharedValue(1);
   const rotation = useSharedValue(0);
   const deleteScale = useSharedValue(0);
-  const isOutside = useSharedValue(false);
+
+  const [draggedId, setDraggedId] = useState(-1);
 
   const panRef = useRef(null);
   const longPressRef = useRef(null);
@@ -183,7 +194,7 @@ function DraggableItem({
   function rearrangeOrder(newOrderPosition: number) {
     'worklet';
 
-    if (!isOutside.value) {
+    if (!isOutside) {
       const newOrder = order.value.filter(orderIndex => orderIndex !== index);
 
       newOrder.splice(newOrderPosition, 0, index);
@@ -270,19 +281,9 @@ function DraggableItem({
   function justDeleteItem() {
     'worklet';
 
-    console.log('index: ', index);
-    console.log('folderIndex: ', folderIndex);
-
     const newData = data.value.filter(item => item.index !== index);
 
-    console.log('newData: ', newData);
-
-    const newOrder = order.value.filter(orderIndex => orderIndex !== index);
-
-    order.value = newOrder;
-
-    console.log('order.value: ', order.value);
-    console.log(initialOrder);
+    updateOrderAfterRemoval(index);
 
     data.value = newData;
   }
@@ -312,6 +313,8 @@ function DraggableItem({
     onStart: (event, ctx) => {
       ctx.startX = activeX.value;
       ctx.startY = activeY.value;
+
+      runOnJS(setDraggedId)(index);
     },
     onActive: (event, ctx) => {
       if (isHeld.value) {
@@ -322,19 +325,35 @@ function DraggableItem({
         const translationX = event.translationX;
         const translationY = event.translationY;
 
-        console.log('newY: ', newY);
-        console.log(parentHeight);
-        if (newY < 0 - itemHeight || newY > parentHeight - 60) {
-          isOutside.value = true;
+        console.log('draggedId: ', draggedId);
 
-          if (isOutside.value) {
-            console.log('isOutside: ', isOutside.value);
-            scale.value = withSpring(0.4, {damping: 12, mass: 1});
+        if (isFolderGrid === true) {
+          if (newY < 0 - itemHeight || newY > parentHeight - 60) {
+            runOnJS(setIsOutside)(true);
+
+            if (isOutside) {
+              // scale.value = withSpring(0.8, {damping: 12, mass: 1});
+              draggedCoordinates.value = {
+                x: event.absoluteX,
+                y: event.absoluteY,
+              };
+
+              // runOnJS(onClose)(event.absoluteX, event.absoluteY);
+              // runOnJS(setDraggedItem)(
+              //   data.value.find(item => item.index === index),
+              // );
+
+              // runOnJS(setContextOrder)([...contextOrder, index]);
+              // runOnJS(setDummyData)([
+              //   ...dummyData,
+              //   data.value.find(item => item.index === index),
+              // ]);
+              // justDeleteItem();
+            }
+          } else {
+            runOnJS(setIsOutside)(false);
+            scale.value = withSpring(1, {damping: 12, mass: 1});
           }
-        } else {
-          isOutside.value = false;
-          console.log('isOutside: ', isOutside.value);
-          scale.value = withSpring(1, {damping: 12, mass: 1});
         }
 
         activeX.value = newX;
@@ -355,18 +374,26 @@ function DraggableItem({
         activeX.value = newX;
         activeY.value = newY;
 
-        if (activeItemIndex.value !== -1 && !isOutside.value) {
+        if (activeItemIndex.value !== -1 && !isOutside) {
           moveToFolder();
         }
 
-        if (isOutside.value) {
-          console.log('usuwam: ', index);
+        if (isOutside) {
+          console.log(
+            'usuwam: ',
+            data.value.find(item => item.index === index),
+          );
+
+          console.log(data.value.find(item => item.index === index));
+          runOnJS(addToMainGrid)(data.value.find(item => item.index === index));
           justDeleteItem();
+          runOnJS(onClose)(event.absoluteX, event.absoluteY);
         }
 
         handleRearrange(newX, newY, translationX, translationY);
       }
 
+      runOnJS(setDraggedId)(-1);
       runOnJS(setScrollEnabled)(true);
       isHeld.value = false;
       isMoving.value = false;
@@ -462,6 +489,10 @@ function DraggableItem({
       },
     ],
   }));
+
+  if (isOutside && draggedId !== index) {
+    return null;
+  }
 
   return (
     <PanGestureHandler

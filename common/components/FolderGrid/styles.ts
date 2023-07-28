@@ -4,6 +4,9 @@ import styled from 'styled-components/native';
 const Styles = {
   Wrapper: styled.View`
     flex: 1;
+    position: absolute;
+    top: 180px;
+    left: 8px;
   `,
   ScrollView: styled(ScrollView)`
     flex: 1;

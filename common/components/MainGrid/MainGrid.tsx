@@ -6,9 +6,10 @@ import Animated, {useSharedValue} from 'react-native-reanimated';
 import {compareScalarArrays} from '../../helpers/common-helpers';
 import DraggableItem from '../DraggableItem';
 import Styles from './styles';
+import {PlayerItem} from '../../context/AppContext';
 
 type Props<T> = {
-  data: (T & {index: number | null})[];
+  data: PlayerItem[];
   initialOrder: number[];
   itemWidth: number;
   parentWidth: number;
@@ -23,7 +24,6 @@ type Props<T> = {
   deleteStyle?: ViewStyle;
   onOrderingFinished?: (newOrder: number[]) => void;
   onChangeDataFinished?: (newData: any[]) => void;
-  portalOpacity: Animated.SharedValue<number>;
 };
 
 function MainGrid<T>({
@@ -42,13 +42,12 @@ function MainGrid<T>({
   deleteStyle,
   onOrderingFinished = () => {},
   onChangeDataFinished = () => {},
-  portalOpacity,
 }: Props<T>) {
   const [HEIGHT, setHEIGHT] = useState(Dimensions.get('window').height);
   const scrollRef = useRef<Animated.ScrollView | null>(null);
-  const sharedOrder = useSharedValue(initialOrder);
   const activeItemIndex = useSharedValue<number>(-1);
   const sharedData = useSharedValue(data);
+  const sharedOrder = useSharedValue(initialOrder);
   const [prevOrder, setPrevOrder] = useState(sharedOrder.value);
   const [isEditing, setIsEditing] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -96,6 +95,7 @@ function MainGrid<T>({
 
   useEffect(() => {
     if (hasOrderChanged) {
+      console.log('order sie zmienil');
       setPrevOrder(sharedOrder.value);
 
       onChangeDataFinished(sharedData.value);
@@ -143,7 +143,6 @@ function MainGrid<T>({
             onClose={onClose}
             parentWidth={parentWidth}
             parentHeight={parentHeight}
-            portalOpacity={portalOpacity}
           />
         ))}
       </Styles.ScrollView>

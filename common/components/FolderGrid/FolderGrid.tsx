@@ -6,13 +6,12 @@ import Animated, {useSharedValue} from 'react-native-reanimated';
 import {compareScalarArrays} from '../../helpers/common-helpers';
 import DraggableItem from '../DraggableItem';
 import Styles from './styles';
-import {TouchableOpacity} from 'react-native-gesture-handler';
 import Carousel from 'react-native-snap-carousel';
 import {Portal} from 'react-native-portalize';
+import {PlayerItem} from '../../context/AppContext';
 
 type Props<T> = {
-  isFolderGrid?: boolean;
-  data: (T & {index: number | null})[];
+  data: PlayerItem[];
   initialOrder: number[];
   itemWidth: number;
   parentWidth: number;
@@ -23,16 +22,18 @@ type Props<T> = {
   renderItem: (item: T, index: number) => JSX.Element;
   deleteRenderItem: (item: T, index: number) => JSX.Element;
   openFolder: (folderData: any) => void;
-  onClose: () => void;
+  onClose: (x: number, y: number) => void;
   deleteStyle?: ViewStyle;
   onOrderingFinished?: (newOrder: number[]) => void;
   onChangeDataFinished?: (newData: any[]) => void;
   display: Animated.SharedValue<string>;
   folderIndex: number;
+  isOutside: boolean;
+  setIsOutside: React.Dispatch<React.SetStateAction<boolean>>;
+  isFolderGrid: boolean;
 };
 
 function FolderGrid<T>({
-  isFolderGrid,
   display,
   data,
   initialOrder,
@@ -50,14 +51,17 @@ function FolderGrid<T>({
   onOrderingFinished = () => {},
   onChangeDataFinished = () => {},
   folderIndex,
+  isOutside,
+  setIsOutside,
+  isFolderGrid,
 }: Props<T>) {
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 9;
 
-  const [HEIGHT, setHEIGHT] = useState(Dimensions.get('window').height);
   const scrollRef = useRef<Animated.ScrollView | null>(null);
   const sharedOrder = useSharedValue(initialOrder);
   const activeItemIndex = useSharedValue<number>(-1);
+  const dragItem = useSharedValue<number>(-1);
   const sharedData = useSharedValue(data);
   const [prevOrder, setPrevOrder] = useState(sharedOrder.value);
   const [isEditing, setIsEditing] = useState(false);
@@ -72,8 +76,6 @@ function FolderGrid<T>({
   useEffect(() => {
     sharedOrder.value = displayedData.map(item => item.index);
   }, [displayedData]);
-
-  console.log('displayedData: ', displayedData);
 
   const numPages = useMemo(
     () => Math.ceil(sharedData.value.length / ITEMS_PER_PAGE),
@@ -155,29 +157,30 @@ function FolderGrid<T>({
 
   return (
     <>
-      <View style={s.pageCarousel}>
-        <Carousel
-          ref={c => {
-            this._carousel = c;
-          }}
-          data={Array.from({length: numPages}, (_, i) => i + 1)}
-          renderItem={({item}) => (
-            <View style={s.pageCarouselItem}>
-              <Text>{item}</Text>
-            </View>
-          )}
-          sliderWidth={Dimensions.get('window').width}
-          itemWidth={60}
-          onSnapToItem={index => setPage(index + 1)}
-        />
-      </View>
+      {isOutside ? null : (
+        <View style={s.pageCarousel}>
+          <Carousel
+            ref={c => {
+              this._carousel = c;
+            }}
+            data={Array.from({length: numPages}, (_, i) => i + 1)}
+            renderItem={({item}) => (
+              <View style={s.pageCarouselItem}>
+                <Text>{item}</Text>
+              </View>
+            )}
+            sliderWidth={Dimensions.get('window').width}
+            itemWidth={60}
+            onSnapToItem={index => setPage(index + 1)}
+          />
+        </View>
+      )}
 
-      <Styles.Wrapper
-        onLayout={event => setHEIGHT(event.nativeEvent.layout.height)}>
+      <Styles.Wrapper>
         <Styles.CancelPressable onPress={cancelEditing} />
         {displayedData.map((item, index) => (
           <DraggableItem
-            key={item.index}
+            key={index}
             index={item.index}
             order={sharedOrder}
             initialOrder={initialOrder}
@@ -197,12 +200,16 @@ function FolderGrid<T>({
             deleteRenderItem={() => deleteRenderItem(item, index)}
             deleteStyle={deleteStyle}
             activeItemIndex={activeItemIndex}
+            dragItem={dragItem}
             openFolder={openFolder}
             onClose={onClose}
             parentWidth={parentWidth}
             parentHeight={parentHeight}
             display={display}
             folderIndex={folderIndex}
+            isOutside={isOutside}
+            setIsOutside={setIsOutside}
+            isFolderGrid={isFolderGrid}
           />
         ))}
       </Styles.Wrapper>
@@ -216,6 +223,8 @@ const s = StyleSheet.create({
   pageCarousel: {
     paddingTop: 10,
     paddingBottom: 10,
+    position: 'absolute',
+    top: 150,
   },
   pageCarouselItem: {
     backgroundColor: 'lightblue',

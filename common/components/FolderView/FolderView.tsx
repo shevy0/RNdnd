@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useContext, useState} from 'react';
 import {
   Dimensions,
   StyleSheet,
@@ -12,12 +12,13 @@ import Animated, {
   FadeIn,
   FadeOut,
   useSharedValue,
-  useAnimatedStyle,
 } from 'react-native-reanimated';
 import DeleteButton from '../DeleteButton/DeleteButton';
 import Tile from '../Tile/Tile';
 import {TextInput} from 'react-native-gesture-handler';
 import FolderGrid from '../FolderGrid';
+import AppContext from '../../context/AppContext';
+import {PlayerItem} from '../../context/AppContext';
 
 const {width} = Dimensions.get('window');
 
@@ -30,24 +31,21 @@ const itemHeight = itemWidth;
 const deleteSize = 30;
 
 type Props = {
-  onClose: () => void;
+  onClose: (x: number, y: number) => void;
   openFolder: (folderData: any) => void;
   setDummyData: (newData: any[]) => void;
-  data: any;
+  data: PlayerItem[];
   folderData: any;
 };
 
-function FolderView({
-  onClose,
-  openFolder,
-  setDummyData,
-  data,
-  folderData,
-}: Props) {
+function FolderView({onClose, openFolder, data, folderData}: Props) {
+  const {dummyData, setDummyData} = useContext(AppContext);
   const [order, setOrder] = useState(
-    data.find(item => item.index === folderData.index)?.folderOrder || [],
+    dummyData.find(item => item.index === folderData.index)?.folderOrder || [],
   );
   const display = useSharedValue('flex');
+
+  const [isOutside, setIsOutside] = useState(false);
 
   const deleteFromFolder = (index: number) => {
     const newData = data.map(item => {
@@ -65,12 +63,14 @@ function FolderView({
   };
 
   const onFolderOrderChange = (newOrder: number[]) => {
+    console.log('newOrder: ', newOrder);
     const newData = data.map(item => {
       if (item.index === folderData.index) {
         return {...item, folderOrder: newOrder};
       }
       return item;
     });
+    console.log('newData: ', newData);
     setDummyData(newData);
   };
 
@@ -101,19 +101,11 @@ function FolderView({
     setDummyData(newData);
   };
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      display: display.value,
-    };
-  });
-
   return (
-    <View>
+    <>
       <Portal>
-        <Animated.View
-          entering={FadeIn}
-          exiting={FadeOut}
-          style={animatedStyle}>
+        <Animated.View entering={FadeIn} exiting={FadeOut} />
+        {isOutside ? null : (
           <BlurView
             {...(Platform.OS === 'ios' && {blurType: 'light'})}
             style={[s.portalContainer]}>
@@ -122,46 +114,60 @@ function FolderView({
                 ...StyleSheet.absoluteFillObject,
               }}
               onPress={() => {
-                onClose();
+                onClose(0, 0);
               }}
             />
-            <View style={s.folderNameContainer}>
-              <TextInput style={s.folderName}>{folderData.name}</TextInput>
-            </View>
-            <Animated.View style={[s.folderViewContainer]}>
-              <FolderGrid<TileType>
-                isFolderGrid={true}
-                display={display}
-                data={folderData.nestedPlayers}
-                openFolder={openFolder}
-                onClose={onClose}
-                handleDelete={deleteFromFolder}
-                initialOrder={order}
-                renderItem={item => (
-                  <Tile width={itemWidth} height={itemHeight} item={item} />
-                )}
-                deleteRenderItem={item => (
-                  <DeleteButton
-                    size={deleteSize}
-                    onPress={() => handleDelete(item.index)}
-                  />
-                )}
-                deleteStyle={{left: -deleteSize / 3, top: -deleteSize / 2}}
-                onOrderingFinished={newOrder => onFolderOrderChange(newOrder)}
-                onChangeDataFinished={newData => onFolderDataChange(newData)}
-                itemWidth={itemWidth}
-                parentWidth={folderViewContainerWidth}
-                parentHeight={folderViewContainerHeight}
-                itemHeight={itemHeight}
-                itemMargin={margin}
-                offsetY={margin}
-                folderIndex={folderData.index}
-              />
-            </Animated.View>
           </BlurView>
-        </Animated.View>
+        )}
+        {isOutside ? null : (
+          <View style={s.folderNameContainer}>
+            <TextInput style={s.folderName}>{folderData.name}</TextInput>
+          </View>
+        )}
+
+        {isOutside ? null : (
+          <Animated.View style={[s.folderViewContainer]}></Animated.View>
+        )}
+
+        <Portal>
+          <FolderGrid<TileType>
+            isFolderGrid={true}
+            display={display}
+            data={
+              dummyData.find(item => item.index === folderData.index)
+                .nestedPlayers
+            }
+            openFolder={openFolder}
+            onClose={onClose}
+            handleDelete={deleteFromFolder}
+            initialOrder={folderData.folderOrder}
+            renderItem={item =>
+              React.cloneElement(
+                <Tile width={itemWidth} height={itemHeight} item={item} />,
+              )
+            }
+            deleteRenderItem={item => (
+              <DeleteButton
+                size={deleteSize}
+                onPress={() => handleDelete(item.index)}
+              />
+            )}
+            deleteStyle={{left: -deleteSize / 3, top: -deleteSize / 2}}
+            onOrderingFinished={newOrder => onFolderOrderChange(newOrder)}
+            onChangeDataFinished={newData => onFolderDataChange(newData)}
+            itemWidth={itemWidth}
+            parentWidth={isOutside ? -100 : folderViewContainerWidth}
+            parentHeight={isOutside ? -100 : folderViewContainerHeight}
+            itemHeight={itemHeight}
+            itemMargin={margin}
+            offsetY={margin}
+            folderIndex={folderData.index}
+            isOutside={isOutside}
+            setIsOutside={setIsOutside}
+          />
+        </Portal>
       </Portal>
-    </View>
+    </>
   );
 }
 
@@ -174,6 +180,10 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   folderViewContainer: {
+    position: 'absolute',
+    top: 150,
+    left: 8,
+    right: 8,
     backgroundColor: 'rgba(27,27,27,0.5)',
     borderRadius: 30,
     width: folderViewContainerWidth,
@@ -182,6 +192,11 @@ const s = StyleSheet.create({
   },
   folderNameContainer: {
     marginBottom: 75,
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   folderName: {
     fontSize: 24,
