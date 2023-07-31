@@ -3,4 +3,5 @@ export default {
   pink: '#F6B1B4',
   white: '#FFFFFF',
   darkBlue: '#202044',
+  green: '#00FF00',
 };

@@ -105,6 +105,7 @@ function FolderView({onClose, openFolder, data, folderData}: Props) {
     <>
       <Portal>
         <Animated.View entering={FadeIn} exiting={FadeOut} />
+        {isOutside ? <View style={s.outsideView} /> : null}
         {isOutside ? null : (
           <BlurView
             {...(Platform.OS === 'ios' && {blurType: 'light'})}
@@ -174,6 +175,10 @@ function FolderView({onClose, openFolder, data, folderData}: Props) {
 export default FolderView;
 
 const s = StyleSheet.create({
+  outsideView: {
+    flex: 1,
+    backgroundColor: 'rgba(27,27,27,0.5)',
+  },
   portalContainer: {
     alignItems: 'center',
     height: '100%',

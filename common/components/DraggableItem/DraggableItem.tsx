@@ -25,6 +25,7 @@ import Animated, {
 import Styles from './styles';
 import AppContext from '../../context/AppContext';
 import {PlayerItem} from '../../context/AppContext';
+import AddButton from '../AddButton';
 
 type Props = {
   index: number;
@@ -549,7 +550,7 @@ function DraggableItem({
           </TapGestureHandler>
         </LongPressGestureHandler>
         <Styles.AnimatedDeleteView style={[deleteStyle, deleteAnimatedStyle]}>
-          {deleteRenderItem()}
+          {isOutside ? <AddButton size={32} /> : deleteRenderItem()}
         </Styles.AnimatedDeleteView>
       </Styles.AnimatedView>
     </PanGestureHandler>
